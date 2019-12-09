@@ -286,3 +286,33 @@ func TestCreateIgnore(t *testing.T) {
 		t.Error("Should ignore duplicate user insert by insert modifier:IGNORE ")
 	}
 }
+
+func TestCreateOnconflict(t *testing.T) {
+	DB.AutoMigrate(&EmailWithIdx{})
+	defer func() { DB.DropTableIfExists(&EmailWithIdx{}) }()
+	now := time.Now()
+	email := EmailWithIdx{RegisteredAt: &now}
+
+	if !DB.NewRecord(email) || !DB.NewRecord(&email) {
+		t.Error("Email should be new record before create")
+	}
+	if res := DB.Where(&email).First(&EmailWithIdx{}); !res.RecordNotFound() {
+		t.Error(res.Error, "OR No record should been found")
+	}
+	if res := DB.CreateOnConflict(&email, "IGNORE"); res.RowsAffected != 1 || res.Error != nil {
+		if res.Error != nil {
+			t.Error(res.Error)
+		}
+		if res.RowsAffected != 1 {
+			t.Error("There should be one record be affected when create record")
+		}
+	}
+	if res := DB.CreateOnConflict(&email, "IGNORE"); res.RowsAffected != 0 || res.Error != nil {
+		if DB.Dialect().GetName() != "mssql" && DB.Dialect().GetName() != "postgres" && res.Error != nil {
+			t.Error(res.Error)
+		}
+		if res.RowsAffected != 0 {
+			t.Error("There should be zero record be affected when create record")
+		}
+	}
+}

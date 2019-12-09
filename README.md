@@ -21,9 +21,12 @@ db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
 ### IGNORE/CreateOrUpdate
 
 ```go
-// INSERT IGNORE INTO
+// mysql: INSERT IGNORE INTO
+// sqlite: INSERT OR IGNORE
 db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)
-// INSERT INTO ... ON CONFLICT KEY UPDATE ...
+
+// mysql: INSERT INTO ... ON CONFLICT KEY UPDATE ...
+// postgresql: INSERT INTO ... ON CONFLICT ... DO UPDATE ...
 db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
 ```
 

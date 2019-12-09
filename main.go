@@ -441,7 +441,7 @@ func (s *DB) GetOrCreate(out interface{}) *DB {
 	result := s.First(out)
 	if result.RecordNotFound() {
 		c := s.clone()
-		return c.NewScope(out).Set("gorm:on_conflict", IGNORE).InstanceSet("gorm:find_again", true).initialize().callCallbacks(s.parent.callbacks.creates).db
+		return c.NewScope(out).InstanceSet("gorm:find_again", true).initialize().callCallbacks(s.parent.callbacks.creates).db
 	}
 	return result
 }
@@ -496,15 +496,23 @@ func (s *DB) Create(value interface{}) *DB {
 // CreateOnConflict `insert ignore into` or `on confilct key update`
 //    db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)  // INSERT IGNORE INTO
 //    db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT KEY UPDATE last_login_at = ...
-func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore interface{}) *DB {
+func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore ...interface{}) *DB {
 	scope := s.NewScope(value)
-	switch v := updateOrIgnore.(type) {
-	case string:
-		scope.Set("gorm:insert_modifier", v)
-	default:
-		updateMap := convertInterfaceToMap(v, false, s)
-		scope.Set("gorm:on_conflict", updateMap)
+	insertMod, updateStr, updateObj := scope.Dialect().OnConflict(updateOrIgnore...)
+	if insertMod == "" && updateStr == "" {
+		s.logger.Print("warning", "Not support on conflict:", scope.Dialect().GetName())
 	}
+	if insertMod != "" {
+		scope.Set("gorm:insert_modifier", insertMod)
+	}
+	if updateStr != "" {
+		scope.Set("gorm:insert_option", updateStr)
+		if updateObj != nil {
+			updateMap := convertInterfaceToMap(updateObj, false, s)
+			scope.Set("gorm:on_conflict_update", updateMap)
+		}
+	}
+
 	return scope.callCallbacks(s.parent.callbacks.creates).db
 }
 

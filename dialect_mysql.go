@@ -3,6 +3,7 @@ package gorm
 import (
 	"crypto/sha1"
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -243,4 +244,16 @@ func (mysql) NormalizeIndexAndColumn(indexName, columnName string) (string, stri
 
 func (mysql) DefaultValueStr() string {
 	return "VALUES()"
+}
+
+func (mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
+	if len(values) != 1 {
+		panic(errors.New("mysql.OnConflict accepts only one argument"))
+	}
+	switch values[0].(type) {
+	case string:
+		return "IGNORE", "", nil
+	default:
+		return "", "ON CONFLICT KEY UPDATE %v", values[0]
+	}
 }

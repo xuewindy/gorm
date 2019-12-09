@@ -1,6 +1,7 @@
 package gorm
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -104,4 +105,16 @@ func (s sqlite3) CurrentDatabase() (name string) {
 		name = *pointers[1]
 	}
 	return
+}
+
+func (sqlite3) OnConflict(values ...interface{}) (string, string, interface{}) {
+	if len(values) != 1 {
+		panic(errors.New("mysql.OnConflict accepts only one argument"))
+	}
+	switch values[0].(type) {
+	case string:
+		return "OR IGNORE", "", nil
+	default:
+		return "", "", nil
+	}
 }
