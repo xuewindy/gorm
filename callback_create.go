@@ -2,7 +2,12 @@ package gorm
 
 import (
 	"fmt"
+	"sort"
 	"strings"
+)
+
+const (
+	IGNORE = "IGNORE"
 )
 
 // Define callbacks for creating
@@ -88,7 +93,22 @@ func createCallback(scope *Scope) {
 		insertModifier  string
 	)
 
-	if str, ok := scope.Get("gorm:insert_option"); ok {
+	if obj, ok := scope.Get("gorm:on_conflict"); ok {
+		// ON CONFLICT KEY UPDATE
+		updateMap := obj.(map[string]interface{})
+		updateColumns := []string{}
+		for field, _ := range updateMap {
+			updateColumns = append(updateColumns, field)
+		}
+		sort.Strings(updateColumns)
+		updateSqls := []string{}
+		for _, column := range updateColumns {
+			value := updateMap[column]
+			updateSqls = append(updateSqls, fmt.Sprintf("%v = %v", scope.Quote(column), scope.AddToVars(value)))
+		}
+		updateSql := strings.Join(updateSqls, ",")
+		extraOption = fmt.Sprintf("ON CONFLICT KEY UPDATE %v", updateSql)
+	} else if str, ok := scope.Get("gorm:insert_option"); ok {
 		extraOption = fmt.Sprint(str)
 	}
 	if str, ok := scope.Get("gorm:insert_modifier"); ok {
@@ -183,6 +203,10 @@ func forceReloadAfterCreateCallback(scope *Scope) {
 				db = db.Where(fmt.Sprintf("%v = ?", field.DBName), field.Field.Interface())
 			}
 		}
+		db.Scan(scope.Value)
+	} else if _, ok := scope.InstanceGet("gorm:find_again"); ok && scope.db.RowsAffected == 0 {
+		db := scope.NewDB().Table(scope.TableName())
+		db.search = scope.Search.clone()
 		db.Scan(scope.Value)
 	}
 }

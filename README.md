@@ -1,6 +1,4 @@
-# GORM
-
-The fantastic ORM library for Golang, aims to be developer friendly.
+# [GORM](https://github.com/jinzhu/gorm)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/sljeff/gorm)](https://goreportcard.com/report/github.com/sljeff/gorm)
 [![wercker status](https://app.wercker.com/status/c8794d29309d12e6f3b52d177bd1e644/s/master "wercker status")](https://app.wercker.com/project/byKey/c8794d29309d12e6f3b52d177bd1e644)
@@ -13,26 +11,23 @@ The fantastic ORM library for Golang, aims to be developer friendly.
 
 ## Overview
 
-* Full-Featured ORM (almost)
-* Associations (Has One, Has Many, Belongs To, Many To Many, Polymorphism)
-* Hooks (Before/After Create/Save/Update/Delete/Find)
-* Preloading (eager loading)
-* Transactions
-* Composite Primary Key
-* SQL Builder
-* Auto Migrations
-* Logger
-* Extendable, write Plugins based on GORM callbacks
-* Every feature comes with tests
-* Developer Friendly
+### GetOrCReate
 
-## Getting Started
+```go
+// Logic: get => create => get again when create failed
+db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
+```
 
-* GORM Guides [https://gorm.io](https://gorm.io)
+### IGNORE/CreateOrUpdate
 
-## Contributing
+```go
+// INSERT IGNORE INTO
+db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)
+// INSERT INTO ... ON CONFLICT KEY UPDATE ...
+db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
+```
 
-[You can help to deliver a better GORM, check out things you can do](https://gorm.io/contribute.html)
+### CreateMany/CreateManyOnConflict
 
 ## License
 

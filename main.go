@@ -436,6 +436,16 @@ func (s *DB) FirstOrCreate(out interface{}, where ...interface{}) *DB {
 	return c
 }
 
+// GetOrCreate find first record or create a new one with given conditions (only works with struct, map conditions). If not found, will find again by conditions.
+func (s *DB) GetOrCreate(out interface{}) *DB {
+	result := s.First(out)
+	if result.RecordNotFound() {
+		c := s.clone()
+		return c.NewScope(out).Set("gorm:on_conflict", IGNORE).InstanceSet("gorm:find_again", true).initialize().callCallbacks(s.parent.callbacks.creates).db
+	}
+	return result
+}
+
 // Update update attributes with callbacks, refer: https://jinzhu.github.io/gorm/crud.html#update
 // WARNING when update with struct, GORM will not update fields that with zero value
 func (s *DB) Update(attrs ...interface{}) *DB {
@@ -480,6 +490,21 @@ func (s *DB) Save(value interface{}) *DB {
 // Create insert the value into database
 func (s *DB) Create(value interface{}) *DB {
 	scope := s.NewScope(value)
+	return scope.callCallbacks(s.parent.callbacks.creates).db
+}
+
+// CreateOnConflict `insert ignore into` or `on confilct key update`
+//    db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)  // INSERT IGNORE INTO
+//    db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT KEY UPDATE last_login_at = ...
+func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore interface{}) *DB {
+	scope := s.NewScope(value)
+	switch v := updateOrIgnore.(type) {
+	case string:
+		scope.Set("gorm:insert_modifier", v)
+	default:
+		updateMap := convertInterfaceToMap(v, false, s)
+		scope.Set("gorm:on_conflict", updateMap)
+	}
 	return scope.callCallbacks(s.parent.callbacks.creates).db
 }
 
