@@ -134,15 +134,12 @@ func (postgres) SupportLastInsertID() bool {
 }
 
 func (postgres) OnConflict(values ...interface{}) (string, string, interface{}) {
-	switch values[0].(type) {
-	case string:
+	if len(values) == 1 {
 		return "", "", nil
-	default:
-		if len(values) != 2 {
-			panic(errors.New("postgres.OnConflict accepts 2 arguments"))
-		}
-		return "", fmt.Sprintf("ON CONFLICT ON CONSTRAINT %s DO UPDATE SET %%v", values[0].(string)), values[1]
+	} else if len(values) != 2 {
+		panic(errors.New("postgres.OnConflict accepts 2 arguments"))
 	}
+	return "", fmt.Sprintf("ON CONFLICT ON CONSTRAINT %s DO UPDATE SET %%v", values[0].(string)), values[1]
 }
 
 func isUUID(value reflect.Value) bool {

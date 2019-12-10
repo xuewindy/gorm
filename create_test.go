@@ -290,9 +290,10 @@ func TestCreateIgnore(t *testing.T) {
 func TestCreateOnconflict(t *testing.T) {
 	DB.AutoMigrate(&EmailWithIdx{})
 	defer func() { DB.DropTableIfExists(&EmailWithIdx{}) }()
-	now := time.Now()
+	now := time.Now().Round(time.Second)
 	email := EmailWithIdx{RegisteredAt: &now}
 
+	// ignore
 	if !DB.NewRecord(email) || !DB.NewRecord(&email) {
 		t.Error("Email should be new record before create")
 	}
@@ -313,6 +314,33 @@ func TestCreateOnconflict(t *testing.T) {
 		}
 		if res.RowsAffected != 0 {
 			t.Error("There should be zero record be affected when create record")
+		}
+	}
+
+	// update
+	if DB.Dialect().GetName() == "postgres" {
+		emailUpdated := EmailWithIdx{UserId: 10086}
+		if res := DB.CreateOnConflict(&email, "email_with_idxes_pkey", &emailUpdated); res.RowsAffected != 1 || res.Error != nil {
+			t.Error(res.Error, "OR There should be one record be affected when create record")
+		}
+		out := EmailWithIdx{}
+		if res := DB.First(&out, &EmailWithIdx{UserId: 10086}); res.Error != nil {
+			t.Error(res.Error)
+		}
+		if !out.RegisteredAt.Equal(now) || out.UserId != 10086 {
+			t.Error(out.UserId, "\n", out.RegisteredAt, "\n", now)
+		}
+	} else if DB.Dialect().GetName() == "mysql" {
+		emailUpdated := EmailWithIdx{UserId: 10000}
+		if res := DB.CreateOnConflict(&email, &emailUpdated); res.RowsAffected != 2 || res.Error != nil {
+			t.Error(res.Error, "OR RowsAffected should be 2 (by mysql doc)")
+		}
+		out := EmailWithIdx{}
+		if res := DB.First(&out, &EmailWithIdx{UserId: 10000}); res.Error != nil {
+			t.Error(res.Error)
+		}
+		if !out.RegisteredAt.Equal(now) || out.UserId != 10000 {
+			t.Error(out.UserId, "\n", out.RegisteredAt, "\n", now)
 		}
 	}
 }

@@ -494,8 +494,9 @@ func (s *DB) Create(value interface{}) *DB {
 }
 
 // CreateOnConflict `insert ignore into` or `on confilct key update`
-//    db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)  // INSERT IGNORE INTO
+//    db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)  // mysql: INSERT IGNORE INTO; sqlite: INSERT OR IGNORE INTO
 //    db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT KEY UPDATE last_login_at = ...
+//    db.CreateOnConflict(User{UserName: "gorm"}, "key", User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT key DO UPDATE last_login_at = ...
 func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore ...interface{}) *DB {
 	scope := s.NewScope(value)
 	insertMod, updateStr, updateObj := scope.Dialect().OnConflict(updateOrIgnore...)

@@ -254,6 +254,6 @@ func (mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
 	case string:
 		return "IGNORE", "", nil
 	default:
-		return "", "ON CONFLICT KEY UPDATE %v", values[0]
+		return "", "ON DUPLICATE KEY UPDATE %v", values[0]
 	}
 }
