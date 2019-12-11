@@ -11,7 +11,11 @@
 
 ## Overview
 
-### GetOrCReate
+### Remove Support for pgsql 9.3 and 9.4
+
+Because of `ON CONFLICT`.
+
+### GetOrCreate
 
 ```go
 // Logic: get => create => get again when create failed
@@ -25,12 +29,16 @@ db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
 // sqlite: INSERT OR IGNORE
 db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)
 
-// mysql: INSERT INTO ... ON CONFLICT KEY UPDATE ...
-// postgresql: INSERT INTO ... ON CONFLICT ... DO UPDATE ...
+// mysql: INSERT INTO ... ON DUPLICATE KEY UPDATE ...
 db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
+
+// postgresql: INSERT INTO ... ON CONFLICT a_key DO UPDATE ...
+db.CreateOnConflict(User{UserName: "gorm"}, "a_key", User{LastLoginAt: time.Now()})
 ```
 
 ### CreateMany/CreateManyOnConflict
+
+TODO
 
 ## License
 
