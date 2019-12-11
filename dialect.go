@@ -55,6 +55,9 @@ type Dialect interface {
 
 	// CurrentDatabase return current database name
 	CurrentDatabase() string
+
+	// ON CONFLICT
+	OnConflict(...interface{}) (string, string, interface{})
 }
 
 var dialectsMap = map[string]Dialect{}

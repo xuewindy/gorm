@@ -436,6 +436,23 @@ func (s *DB) FirstOrCreate(out interface{}, where ...interface{}) *DB {
 	return c
 }
 
+// GetOrCreate find first record or create a new one with given conditions (only works with struct, map conditions). If not found, will find again by conditions without errors.
+//     // Logic: get by `Where` => create by `Where` and `Attrs` => get again by `Where` when create fail
+//     db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
+func (s *DB) GetOrCreate(out interface{}) *DB {
+	result := s.First(out)
+	if result.RecordNotFound() {
+		c := s.clone()
+		foundDB := c.NewScope(out).initialize().callCallbacks(s.parent.callbacks.creates).db
+		if foundDB.Error != nil {
+			c := s.clone()
+			return c.First(out)
+		}
+		return foundDB
+	}
+	return result
+}
+
 // Update update attributes with callbacks, refer: https://jinzhu.github.io/gorm/crud.html#update
 // WARNING when update with struct, GORM will not update fields that with zero value
 func (s *DB) Update(attrs ...interface{}) *DB {
@@ -480,6 +497,30 @@ func (s *DB) Save(value interface{}) *DB {
 // Create insert the value into database
 func (s *DB) Create(value interface{}) *DB {
 	scope := s.NewScope(value)
+	return scope.callCallbacks(s.parent.callbacks.creates).db
+}
+
+// CreateOnConflict `insert ignore into` or `on confilct key update`
+//    db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)  // mysql: INSERT IGNORE INTO; sqlite: INSERT OR IGNORE INTO
+//    db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT KEY UPDATE last_login_at = ...
+//    db.CreateOnConflict(User{UserName: "gorm"}, "key", User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT key DO UPDATE last_login_at = ...
+func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore ...interface{}) *DB {
+	scope := s.NewScope(value)
+	insertMod, updateStr, updateObj := scope.Dialect().OnConflict(updateOrIgnore...)
+	if insertMod == "" && updateStr == "" {
+		s.logger.Print("warning", "Not support on conflict:", scope.Dialect().GetName())
+	}
+	if insertMod != "" {
+		scope.Set("gorm:insert_modifier", insertMod)
+	}
+	if updateStr != "" {
+		scope.Set("gorm:insert_option", updateStr)
+		if updateObj != nil {
+			updateMap := convertInterfaceToMap(updateObj, false, s)
+			scope.Set("gorm:on_conflict_update", updateMap)
+		}
+	}
+
 	return scope.callCallbacks(s.parent.callbacks.creates).db
 }
 

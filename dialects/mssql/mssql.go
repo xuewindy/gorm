@@ -220,6 +220,10 @@ func (mssql) NormalizeIndexAndColumn(indexName, columnName string) (string, stri
 	return indexName, columnName
 }
 
+func (mssql) OnConflict(...interface{}) (string, string, interface{}) {
+	return "", "", nil
+}
+
 func currentDatabaseAndTable(dialect gorm.Dialect, tableName string) (string, string) {
 	if strings.Contains(tableName, ".") {
 		splitStrings := strings.SplitN(tableName, ".", 2)

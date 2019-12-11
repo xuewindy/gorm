@@ -244,3 +244,12 @@ func (mysql) NormalizeIndexAndColumn(indexName, columnName string) (string, stri
 func (mysql) DefaultValueStr() string {
 	return "VALUES()"
 }
+
+func (mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
+	switch values[0].(type) {
+	case string:
+		return "IGNORE", "", nil
+	default:
+		return "", "ON DUPLICATE KEY UPDATE %v", values[0]
+	}
+}

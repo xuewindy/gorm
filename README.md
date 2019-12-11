@@ -1,6 +1,4 @@
-# GORM
-
-The fantastic ORM library for Golang, aims to be developer friendly.
+# [GORM](https://github.com/jinzhu/gorm)
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/sljeff/gorm)](https://goreportcard.com/report/github.com/sljeff/gorm)
 [![wercker status](https://app.wercker.com/status/c8794d29309d12e6f3b52d177bd1e644/s/master "wercker status")](https://app.wercker.com/project/byKey/c8794d29309d12e6f3b52d177bd1e644)
@@ -13,26 +11,34 @@ The fantastic ORM library for Golang, aims to be developer friendly.
 
 ## Overview
 
-* Full-Featured ORM (almost)
-* Associations (Has One, Has Many, Belongs To, Many To Many, Polymorphism)
-* Hooks (Before/After Create/Save/Update/Delete/Find)
-* Preloading (eager loading)
-* Transactions
-* Composite Primary Key
-* SQL Builder
-* Auto Migrations
-* Logger
-* Extendable, write Plugins based on GORM callbacks
-* Every feature comes with tests
-* Developer Friendly
+### Remove Support for pgsql 9.3 and 9.4
 
-## Getting Started
+Because of `ON CONFLICT`.
 
-* GORM Guides [https://gorm.io](https://gorm.io)
+### GetOrCreate
 
-## Contributing
+```go
+// Logic: get => create => get again when create failed
+db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
+```
 
-[You can help to deliver a better GORM, check out things you can do](https://gorm.io/contribute.html)
+### IGNORE/CreateOrUpdate
+
+```go
+// mysql: INSERT IGNORE INTO
+// sqlite: INSERT OR IGNORE
+db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)
+
+// mysql: INSERT INTO ... ON DUPLICATE KEY UPDATE ...
+db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
+
+// postgresql: INSERT INTO ... ON CONFLICT a_key DO UPDATE ...
+db.CreateOnConflict(User{UserName: "gorm"}, "a_key", User{LastLoginAt: time.Now()})
+```
+
+### CreateMany/CreateManyOnConflict
+
+TODO
 
 ## License
 

@@ -1,8 +1,14 @@
 package gorm
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
+)
+
+const (
+	IGNORE = "IGNORE"
 )
 
 // Define callbacks for creating
@@ -88,7 +94,25 @@ func createCallback(scope *Scope) {
 		insertModifier  string
 	)
 
-	if str, ok := scope.Get("gorm:insert_option"); ok {
+	if obj, ok := scope.Get("gorm:on_conflict_update"); ok {
+		insertStr, ok := scope.Get("gorm:insert_option")
+		if !ok {
+			scope.Err(errors.New("gorm:insert_option not found"))
+		}
+		updateMap := obj.(map[string]interface{})
+		updateColumns := []string{}
+		for field, _ := range updateMap {
+			updateColumns = append(updateColumns, field)
+		}
+		sort.Strings(updateColumns)
+		updateSqls := []string{}
+		for _, column := range updateColumns {
+			value := updateMap[column]
+			updateSqls = append(updateSqls, fmt.Sprintf("%v = %v", scope.Quote(column), scope.AddToVars(value)))
+		}
+		updateSql := strings.Join(updateSqls, ",")
+		extraOption = fmt.Sprintf(fmt.Sprint(insertStr), updateSql)
+	} else if str, ok := scope.Get("gorm:insert_option"); ok {
 		extraOption = fmt.Sprint(str)
 	}
 	if str, ok := scope.Get("gorm:insert_modifier"); ok {

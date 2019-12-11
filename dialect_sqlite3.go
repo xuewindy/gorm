@@ -105,3 +105,12 @@ func (s sqlite3) CurrentDatabase() (name string) {
 	}
 	return
 }
+
+func (sqlite3) OnConflict(values ...interface{}) (string, string, interface{}) {
+	switch values[0].(type) {
+	case string:
+		return "OR IGNORE", "", nil
+	default:
+		return "", "", nil
+	}
+}

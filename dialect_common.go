@@ -194,3 +194,8 @@ func (commonDialect) parseInt(value interface{}) (int64, error) {
 func IsByteArrayOrSlice(value reflect.Value) bool {
 	return (value.Kind() == reflect.Array || value.Kind() == reflect.Slice) && value.Type().Elem() == reflect.TypeOf(uint8(0))
 }
+
+// OnConflict returns strings of `INSERT str1 INTO TABLE FIELDS VALUES str2` and var
+func (commonDialect) OnConflict(...interface{}) (string, string, interface{}) {
+	return "", "", nil
+}

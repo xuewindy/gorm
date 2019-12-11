@@ -286,3 +286,101 @@ func TestCreateIgnore(t *testing.T) {
 		t.Error("Should ignore duplicate user insert by insert modifier:IGNORE ")
 	}
 }
+
+func TestCreateOnconflict(t *testing.T) {
+	DB.AutoMigrate(&EmailWithIdx{})
+	defer func() { DB.DropTableIfExists(&EmailWithIdx{}) }()
+	now := time.Now().Round(time.Second)
+	email := EmailWithIdx{RegisteredAt: &now}
+
+	// ignore
+	if !DB.NewRecord(email) || !DB.NewRecord(&email) {
+		t.Error("Email should be new record before create")
+	}
+	if res := DB.Where(&email).First(&EmailWithIdx{}); !res.RecordNotFound() {
+		t.Error(res.Error, "OR No record should been found")
+	}
+	if res := DB.CreateOnConflict(&email, "IGNORE"); res.RowsAffected != 1 || res.Error != nil {
+		if res.Error != nil {
+			t.Error(res.Error)
+		}
+		if res.RowsAffected != 1 {
+			t.Error("There should be one record be affected when create record")
+		}
+	}
+	if res := DB.CreateOnConflict(&email, "IGNORE"); res.RowsAffected != 0 || res.Error != nil {
+		if DB.Dialect().GetName() != "mssql" && DB.Dialect().GetName() != "postgres" && res.Error != nil {
+			t.Error(res.Error)
+		}
+		if res.RowsAffected != 0 {
+			t.Error("There should be zero record be affected when create record")
+		}
+	}
+
+	// update
+	if DB.Dialect().GetName() == "postgres" {
+		emailUpdated := EmailWithIdx{UserId: 10086}
+		if res := DB.CreateOnConflict(&email, "email_with_idxes_pkey", &emailUpdated); res.RowsAffected != 1 || res.Error != nil {
+			t.Error(res.Error, "OR There should be one record be affected when create record")
+		}
+		out := EmailWithIdx{}
+		if res := DB.First(&out, &EmailWithIdx{UserId: 10086}); res.Error != nil {
+			t.Error(res.Error)
+		}
+		if !out.RegisteredAt.Equal(now) || out.UserId != 10086 {
+			t.Error(out.UserId, "\n", out.RegisteredAt, "\n", now)
+		}
+	} else if DB.Dialect().GetName() == "mysql" {
+		emailUpdated := EmailWithIdx{UserId: 10000}
+		if res := DB.CreateOnConflict(&email, &emailUpdated); res.RowsAffected != 2 || res.Error != nil {
+			t.Error(res.Error, "OR RowsAffected should be 2 (by mysql doc)")
+		}
+		out := EmailWithIdx{}
+		if res := DB.First(&out, &EmailWithIdx{UserId: 10000}); res.Error != nil {
+			t.Error(res.Error)
+		}
+		if !out.RegisteredAt.Equal(now) || out.UserId != 10000 {
+			t.Error(out.UserId, "\n", out.RegisteredAt, "\n", now)
+		}
+	}
+}
+
+func TestGetOrCreate(t *testing.T) {
+	DB.AutoMigrate(&EmailWithIdx{})
+	defer func() { DB.DropTableIfExists(&EmailWithIdx{}) }()
+	now := time.Now().Round(time.Second)
+	email := EmailWithIdx{RegisteredAt: &now}
+	out := EmailWithIdx{}
+
+	// GetOrCreate: create
+	if res := DB.Where(&email).Attrs(&EmailWithIdx{UserId: 10086}).GetOrCreate(&out); res.RowsAffected != 1 || res.Error != nil {
+		t.Error(res.Error, "OR RowsAffected should be 1")
+	}
+	if out.UserId != 10086 || !out.RegisteredAt.Equal(now) {
+		t.Error("Found wrong item")
+	}
+	createOutId := out.Id
+	// Find
+	out = EmailWithIdx{}
+	if res := DB.Where(&email).Find(&out); res.RowsAffected != 1 || res.Error != nil {
+		t.Error(res.Error, "OR RowsAffected should be 1")
+		t.Error(out)
+	}
+	if !out.RegisteredAt.Equal(now) || out.UserId != 10086 || out.Id != createOutId {
+		t.Error("Found wrong item")
+	}
+	// GetOrCreate: get
+	out = EmailWithIdx{}
+	if res := DB.Where(&email).Attrs(&EmailWithIdx{UserId: 10000}).GetOrCreate(&out); res.RowsAffected != 1 || res.Error != nil {
+		t.Error(res.Error, "OR RowsAffected should be 1")
+		t.Error(out)
+	}
+	if !out.RegisteredAt.Equal(now) || out.UserId != 10086 || out.Id != createOutId {
+		t.Error("Found wrong item")
+	}
+	// GetOrCreate: create fail, get again and NotFound
+	out = EmailWithIdx{}
+	if res := DB.Where(&EmailWithIdx{UserId: 10010}).Attrs(&EmailWithIdx{RegisteredAt: &now}).GetOrCreate(&out); !res.RecordNotFound() {
+		t.Error("Expected should be NotFound, but got", res.Error)
+	}
+}
