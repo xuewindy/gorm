@@ -3,7 +3,6 @@ package gorm
 import (
 	"crypto/sha1"
 	"database/sql"
-	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -247,9 +246,6 @@ func (mysql) DefaultValueStr() string {
 }
 
 func (mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
-	if len(values) != 1 {
-		panic(errors.New("mysql.OnConflict accepts only one argument"))
-	}
 	switch values[0].(type) {
 	case string:
 		return "IGNORE", "", nil

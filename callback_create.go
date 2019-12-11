@@ -208,10 +208,6 @@ func forceReloadAfterCreateCallback(scope *Scope) {
 			}
 		}
 		db.Scan(scope.Value)
-	} else if _, ok := scope.InstanceGet("gorm:find_again"); ok && scope.db.RowsAffected == 0 {
-		db := scope.NewDB().Table(scope.TableName())
-		db.search = scope.Search.clone()
-		db.Scan(scope.Value)
 	}
 }
 

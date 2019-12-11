@@ -436,12 +436,19 @@ func (s *DB) FirstOrCreate(out interface{}, where ...interface{}) *DB {
 	return c
 }
 
-// GetOrCreate find first record or create a new one with given conditions (only works with struct, map conditions). If not found, will find again by conditions.
+// GetOrCreate find first record or create a new one with given conditions (only works with struct, map conditions). If not found, will find again by conditions without errors.
+//     // Logic: get by `Where` => create by `Where` and `Attrs` => get again by `Where` when create fail
+//     db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
 func (s *DB) GetOrCreate(out interface{}) *DB {
 	result := s.First(out)
 	if result.RecordNotFound() {
 		c := s.clone()
-		return c.NewScope(out).InstanceSet("gorm:find_again", true).initialize().callCallbacks(s.parent.callbacks.creates).db
+		foundDB := c.NewScope(out).initialize().callCallbacks(s.parent.callbacks.creates).db
+		if foundDB.Error != nil {
+			c := s.clone()
+			return c.First(out)
+		}
+		return foundDB
 	}
 	return result
 }
