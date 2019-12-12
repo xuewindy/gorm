@@ -86,6 +86,8 @@ func createCallback(scope *Scope) {
 			}
 		}
 	}
+	columnsString := strings.Join(columns, ",")
+	placeholdersString := "(" + strings.Join(placeholders, ",") + ")"
 
 	var (
 		returningColumn = "*"
@@ -148,12 +150,12 @@ func createCallback(scope *Scope) {
 		))
 	} else {
 		scope.Raw(fmt.Sprintf(
-			"INSERT%v INTO %v (%v)%v VALUES (%v)%v%v",
+			"INSERT%v INTO %v (%v)%v VALUES %v%v%v",
 			addExtraSpaceIfExist(insertModifier),
 			scope.QuotedTableName(),
-			strings.Join(columns, ","),
+			columnsString,
 			addExtraSpaceIfExist(lastInsertIDOutputInterstitial),
-			strings.Join(placeholders, ","),
+			placeholdersString,
 			addExtraSpaceIfExist(extraOption),
 			addExtraSpaceIfExist(lastInsertIDReturningSuffix),
 		))
