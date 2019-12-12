@@ -65,6 +65,7 @@ func createCallback(scope *Scope) {
 		blankColumnsWithDefaultValue []string
 	)
 
+	// Set columns; Add placeholders and vars for `value_list`
 	for _, field := range scope.Fields() {
 		if scope.changeableField(field) {
 			if field.IsNormal && !field.IsIgnored {
@@ -94,6 +95,7 @@ func createCallback(scope *Scope) {
 		insertModifier  string
 	)
 
+	// Add placeholders and vars for `ON CONFLICT`
 	if obj, ok := scope.Get("gorm:on_conflict_update"); ok {
 		insertStr, ok := scope.Get("gorm:insert_option")
 		if !ok {
@@ -115,6 +117,7 @@ func createCallback(scope *Scope) {
 	} else if str, ok := scope.Get("gorm:insert_option"); ok {
 		extraOption = fmt.Sprint(str)
 	}
+	// Set insert_modifier
 	if str, ok := scope.Get("gorm:insert_modifier"); ok {
 		insertModifier = strings.ToUpper(fmt.Sprint(str))
 		if insertModifier == "INTO" {
@@ -126,12 +129,14 @@ func createCallback(scope *Scope) {
 		returningColumn = scope.Quote(primaryField.DBName)
 	}
 
+	// Set `RETURNING`
 	lastInsertIDOutputInterstitial := scope.Dialect().LastInsertIDOutputInterstitial(quotedTableName, returningColumn, columns)
 	var lastInsertIDReturningSuffix string
 	if lastInsertIDOutputInterstitial == "" {
 		lastInsertIDReturningSuffix = scope.Dialect().LastInsertIDReturningSuffix(quotedTableName, returningColumn)
 	}
 
+	// Set scope.SQL
 	if len(columns) == 0 {
 		scope.Raw(fmt.Sprintf(
 			"INSERT%v INTO %v %v%v%v",
