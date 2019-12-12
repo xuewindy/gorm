@@ -524,6 +524,27 @@ func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore ...interface{}) 
 	return scope.callCallbacks(s.parent.callbacks.creates).db
 }
 
+// CreateMany Ignore only support MySQL and sqlite
+//     db.CreateMany([]interface{}{&user1, &user2, &user3}, gorm.IGNORE)
+//     db.CreateMany([]interface{}{&user1, &user2, &user3})
+func (s *DB) CreateMany(values []interface{}, ignore ...interface{}) *DB {
+	var createMany [](map[string]interface{})
+	for _, value := range values {
+		createMany = append(createMany, convertInterfaceToMap(value, false, s))
+	}
+	scope := s.NewScope(values[0]).Set("gorm:create_many", createMany)
+	if len(ignore) > 0 {
+		insertMod, _, _ := scope.Dialect().OnConflict(ignore...)
+		if insertMod == "" {
+			s.logger.Print("warning", "Not support on conflict:", scope.Dialect().GetName())
+		}
+		if insertMod != "" {
+			scope.Set("gorm:insert_modifier", insertMod)
+		}
+	}
+	return scope.callCallbacks(s.parent.callbacks.creates).db
+}
+
 // Delete delete value match given conditions, if the value has primary key, then will including the primary key as condition
 // WARNING If model has DeletedAt field, GORM will only set field DeletedAt's value to current time
 func (s *DB) Delete(value interface{}, where ...interface{}) *DB {

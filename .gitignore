@@ -1,3 +1,4 @@
 documents
 coverage.txt
+coverage*.out
 _book
