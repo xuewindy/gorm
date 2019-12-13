@@ -22,7 +22,7 @@ Because of `ON CONFLICT`.
 db.Where(User{Name: "jinzhu"}).Attrs(User{Age: 30}).GetOrCreate(&user)
 ```
 
-### IGNORE/CreateOrUpdate
+### IGNORE/ON CONFLICT UPDATE
 
 ```go
 // mysql: INSERT IGNORE INTO
@@ -36,9 +36,19 @@ db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
 db.CreateOnConflict(User{UserName: "gorm"}, "a_key", User{LastLoginAt: time.Now()})
 ```
 
-### CreateMany/CreateManyOnConflict
+### CreateMany/CreateMany OnConflict
 
-TODO
+```go
+// mysql and sqlite: insert multiple; insert multiple ignore duplicate
+db.CreateMany([]interface{}{&user1, &user2, &user3}, gorm.IGNORE)
+db.CreateMany([]interface{}{&user1, &user2, &user3})
+
+// postgresql and mssql do not support ignore
+db.CreateMany([]interface{}{&user1, &user2, &user3})
+
+// Caution: mssql db driver do not raise error on duplicate
+db.CreateMany([]interface{}{&user1, &user1, &user1})
+```
 
 ## License
 
