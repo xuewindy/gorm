@@ -66,28 +66,66 @@ func createCallback(scope *Scope) {
 	)
 
 	// Set columns; Add placeholders and vars for `value_list`
-	for _, field := range scope.Fields() {
-		if scope.changeableField(field) {
-			if field.IsNormal && !field.IsIgnored {
-				if field.IsBlank && field.HasDefaultValue {
-					blankColumnsWithDefaultValue = append(blankColumnsWithDefaultValue, scope.Quote(field.DBName))
-					scope.InstanceSet("gorm:blank_columns_with_default_value", blankColumnsWithDefaultValue)
-				} else if !field.IsPrimaryKey || !field.IsBlank {
-					columns = append(columns, scope.Quote(field.DBName))
+	var (
+		columnsString      string
+		placeholdersString string
+	)
+	if values, ok := scope.Get("gorm:create_many"); ok {
+		// CreateMany
+		for _, field := range scope.Fields() {
+			if !field.IsPrimaryKey || !field.IsBlank {
+				columns = append(columns, field.DBName)
+			}
+		}
+		createMany := values.([](map[string]interface{}))
+		var placeholdersStrings []string
+		firstObjLength := len(createMany[0])
+		for _, obj := range createMany {
+			if len(obj) != firstObjLength {
+				scope.Err(errors.New("createMany objects should have the same fields"))
+				return
+			}
+			placeholders = []string{}
+			for _, column := range columns {
+				if fieldValue, ok := obj[column]; ok {
+					placeholders = append(placeholders, scope.AddToVars(fieldValue))
+				} else {
+					field, _ := scope.FieldByName(column)
 					placeholders = append(placeholders, scope.AddToVars(field.Field.Interface()))
 				}
-			} else if field.Relationship != nil && field.Relationship.Kind == "belongs_to" {
-				for _, foreignKey := range field.Relationship.ForeignDBNames {
-					if foreignField, ok := scope.FieldByName(foreignKey); ok && !scope.changeableField(foreignField) {
-						columns = append(columns, scope.Quote(foreignField.DBName))
-						placeholders = append(placeholders, scope.AddToVars(foreignField.Field.Interface()))
+			}
+			placeholdersStrings = append(placeholdersStrings, "("+strings.Join(placeholders, ",")+")")
+		}
+		for index, column := range columns {
+			columns[index] = scope.Quote(column)
+		}
+		columnsString = strings.Join(columns, ",")
+		placeholdersString = strings.Join(placeholdersStrings, ",")
+	} else {
+		// Normal
+		for _, field := range scope.Fields() {
+			if scope.changeableField(field) {
+				if field.IsNormal && !field.IsIgnored {
+					if field.IsBlank && field.HasDefaultValue {
+						blankColumnsWithDefaultValue = append(blankColumnsWithDefaultValue, scope.Quote(field.DBName))
+						scope.InstanceSet("gorm:blank_columns_with_default_value", blankColumnsWithDefaultValue)
+					} else if !field.IsPrimaryKey || !field.IsBlank {
+						columns = append(columns, scope.Quote(field.DBName))
+						placeholders = append(placeholders, scope.AddToVars(field.Field.Interface()))
+					}
+				} else if field.Relationship != nil && field.Relationship.Kind == "belongs_to" {
+					for _, foreignKey := range field.Relationship.ForeignDBNames {
+						if foreignField, ok := scope.FieldByName(foreignKey); ok && !scope.changeableField(foreignField) {
+							columns = append(columns, scope.Quote(foreignField.DBName))
+							placeholders = append(placeholders, scope.AddToVars(foreignField.Field.Interface()))
+						}
 					}
 				}
 			}
 		}
+		columnsString = strings.Join(columns, ",")
+		placeholdersString = "(" + strings.Join(placeholders, ",") + ")"
 	}
-	columnsString := strings.Join(columns, ",")
-	placeholdersString := "(" + strings.Join(placeholders, ",") + ")"
 
 	var (
 		returningColumn = "*"
@@ -102,6 +140,7 @@ func createCallback(scope *Scope) {
 		insertStr, ok := scope.Get("gorm:insert_option")
 		if !ok {
 			scope.Err(errors.New("gorm:insert_option not found"))
+			return
 		}
 		updateMap := obj.(map[string]interface{})
 		updateColumns := []string{}
@@ -198,6 +237,9 @@ func createCallback(scope *Scope) {
 		if err := scope.SQLDB().QueryRow(scope.SQL, scope.SQLVars...).Scan(primaryField.Field.Addr().Interface()); scope.Err(err) == nil {
 			primaryField.IsBlank = false
 			scope.db.RowsAffected = 1
+			if values, ok := scope.Get("gorm:create_many"); ok {
+				scope.db.RowsAffected = int64(len(values.([](map[string]interface{}))))
+			}
 		}
 	} else {
 		scope.Err(ErrUnaddressable)

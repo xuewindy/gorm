@@ -1419,3 +1419,21 @@ func (scope *Scope) hasConditions() bool {
 		len(scope.Search.orConditions) > 0 ||
 		len(scope.Search.notConditions) > 0
 }
+
+func (scope *Scope) onConflict(updateOrIgnore ...interface{}) bool {
+	insertMod, updateStr, updateObj := scope.Dialect().OnConflict(updateOrIgnore...)
+	if insertMod == "" && updateStr == "" {
+		return false
+	}
+	if insertMod != "" {
+		scope.Set("gorm:insert_modifier", insertMod)
+	}
+	if updateStr != "" {
+		scope.Set("gorm:insert_option", updateStr)
+		if updateObj != nil {
+			updateMap := convertInterfaceToMap(updateObj, false, scope.db)
+			scope.Set("gorm:on_conflict_update", updateMap)
+		}
+	}
+	return true
+}

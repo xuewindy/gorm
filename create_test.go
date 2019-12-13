@@ -384,3 +384,121 @@ func TestGetOrCreate(t *testing.T) {
 		t.Error("Expected should be NotFound, but got", res.Error)
 	}
 }
+
+func TestCreateMany(t *testing.T) {
+	DB.Delete(&Email{})
+	if res := DB.CreateMany([]interface{}{
+		&Email{UserId: 1, Email: "jeff@qq.com"},
+		&Email{UserId: 2, Email: "alan@qq.com"},
+		&Email{UserId: 3, Email: "alice@qq.com"},
+		&Email{UserId: 4, Email: "bob@qq.com"},
+	}); res.Error != nil || res.RowsAffected != 4 {
+		t.Error(res.Error, "OR RowsAffected should be 4, got %d", res.RowsAffected)
+	}
+	emails := []Email{}
+	DB.Model(&Email{}).Find(&emails)
+	if len(emails) != 4 {
+		t.Error("count should be 4")
+	}
+	createAt := time.Time{}
+	userIds := [4]int{}
+	emailEmails := [4]string{}
+	for index, email := range emails {
+		if createAt.Equal(time.Time{}) {
+			createAt = email.CreatedAt
+		} else if !createAt.Equal(email.CreatedAt) {
+			t.Errorf("%s, %s", email.CreatedAt, createAt)
+		}
+		t.Log(email)
+		userIds[index] = email.UserId
+		emailEmails[index] = email.Email
+	}
+	if userIds != [4]int{1, 2, 3, 4} {
+		t.Errorf("expected []int{1,2,3,4}, but got %d", userIds)
+	}
+	if emailEmails != [4]string{"jeff@qq.com", "alan@qq.com", "alice@qq.com", "bob@qq.com"} {
+		t.Errorf("%v", emailEmails)
+	}
+	DB.Delete(&Email{})
+
+	// fields not same
+	if res := DB.CreateMany([]interface{}{
+		&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
+		&Email{UserId: 2, Email: "alan@qq.com"},
+		&Email{UserId: 3, Email: "alice@qq.com"},
+		&Email{UserId: 4, Email: "bob@qq.com"},
+	}); res.Error.Error() != "createMany objects should have the same fields" {
+		t.Error("Expected error createMany objects should have the same fields, got", res.Error.Error())
+	}
+
+	// OnConflict IGNORE
+	if DB.Dialect().GetName() == "mssql" {
+		t.Log("mssqldb driver do not raise error when insert many on conflict")
+	} else {
+		// Duplicate
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
+			&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
+			&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
+			&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
+		}); res.Error == nil {
+			t.Error("Expected error Duplicate entry, but got nil")
+		}
+
+	}
+	if DB.Dialect().GetName() == "mysql" || DB.Dialect().GetName() == "sqlite3" {
+		// Ignore
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
+			&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
+			&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
+			&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
+		}, "IGNORE"); res.Error != nil {
+			t.Error(res.Error)
+		}
+		emails = []Email{}
+		DB.Model(&Email{}).Find(&emails)
+		if len(emails) != 1 {
+			t.Error("count should be 1, but got", len(emails))
+		}
+	}
+
+	// OnConflict UPDATE
+	DB.Delete(&Email{})
+	if DB.Dialect().GetName() == "postgres" || DB.Dialect().GetName() == "mysql" {
+		DB.Create(&Email{Id: 1, UserId: 10086, Email: "hello@example.com"})
+
+		var updateOrIgnore []interface{}
+		if DB.Dialect().GetName() == "postgres" {
+			updateOrIgnore = []interface{}{"emails_pkey", &Email{Id: 100, UserId: 10010}}
+		} else {
+			updateOrIgnore = []interface{}{&Email{Id: 100, UserId: 10010}}
+		}
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 10086, Email: "hello@example.com"}, // Duplicate
+			&Email{Id: 2, UserId: 10086, Email: "hello@example.com"}, // Normal
+		}, updateOrIgnore...); res.Error != nil {
+			t.Error(res.Error)
+		}
+
+		emails := []Email{}
+		if DB.Model(&Email{}).Find(&emails); len(emails) != 2 {
+			t.Error("Expected 2 emails, got", len(emails))
+		}
+		emails2 := emails[0]
+		emails100 := emails[1]
+		if emails2.Id != 2 {
+			emails2 = emails[1]
+			emails100 = emails[0]
+		}
+		if emails2.Id != 2 || emails2.UserId != 10086 {
+			// insert success
+			t.Error("Expected email 2 user ID 10086 , got", emails[0].Id, emails[0].UserId)
+		}
+		if emails100.Id != 100 || emails100.UserId != 10010 {
+			// update success
+			t.Error("Expected email 100 user ID 10010 , got", emails[1].Id, emails[1].UserId)
+		}
+	}
+	DB.Delete(&Email{})
+}

@@ -506,21 +506,27 @@ func (s *DB) Create(value interface{}) *DB {
 //    db.CreateOnConflict(User{UserName: "gorm"}, "key", User{LastLoginAt: time.Now()})  // INSERT INTO ... ON CONFLICT key DO UPDATE last_login_at = ...
 func (s *DB) CreateOnConflict(value interface{}, updateOrIgnore ...interface{}) *DB {
 	scope := s.NewScope(value)
-	insertMod, updateStr, updateObj := scope.Dialect().OnConflict(updateOrIgnore...)
-	if insertMod == "" && updateStr == "" {
+	if !scope.onConflict(updateOrIgnore...) {
 		s.logger.Print("warning", "Not support on conflict:", scope.Dialect().GetName())
 	}
-	if insertMod != "" {
-		scope.Set("gorm:insert_modifier", insertMod)
+
+	return scope.callCallbacks(s.parent.callbacks.creates).db
+}
+
+// CreateMany Ignore only support MySQL and sqlite
+//     db.CreateMany([]interface{}{&user1, &user2, &user3}, gorm.IGNORE)
+//     db.CreateMany([]interface{}{&user1, &user2, &user3})
+func (s *DB) CreateMany(values []interface{}, updateOrIgnore ...interface{}) *DB {
+	var createMany [](map[string]interface{})
+	for _, value := range values {
+		createMany = append(createMany, convertInterfaceToMap(value, false, s))
 	}
-	if updateStr != "" {
-		scope.Set("gorm:insert_option", updateStr)
-		if updateObj != nil {
-			updateMap := convertInterfaceToMap(updateObj, false, s)
-			scope.Set("gorm:on_conflict_update", updateMap)
+	scope := s.NewScope(values[0]).Set("gorm:create_many", createMany)
+	if len(updateOrIgnore) > 0 {
+		if !scope.onConflict(updateOrIgnore...) {
+			s.logger.Print("warning", "Not support on conflict:", scope.Dialect().GetName())
 		}
 	}
-
 	return scope.callCallbacks(s.parent.callbacks.creates).db
 }
 
