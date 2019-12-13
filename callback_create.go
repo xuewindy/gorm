@@ -262,6 +262,9 @@ func forceReloadAfterCreateCallback(scope *Scope) {
 
 // afterCreateCallback will invoke `AfterCreate`, `AfterSave` method after creating
 func afterCreateCallback(scope *Scope) {
+	if _, ok := scope.Get("gorm:create_many"); ok {
+		return
+	}
 	if !scope.HasError() {
 		scope.CallMethod("AfterCreate")
 	}

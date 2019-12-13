@@ -470,9 +470,9 @@ func TestCreateMany(t *testing.T) {
 
 		var updateOrIgnore []interface{}
 		if DB.Dialect().GetName() == "postgres" {
-			updateOrIgnore = []interface{}{"emails_pkey", &Email{Id: 100, UserId: 10010}}
+			updateOrIgnore = []interface{}{"emails_pkey", &Email{UserId: 10010}}
 		} else {
-			updateOrIgnore = []interface{}{&Email{Id: 100, UserId: 10010}}
+			updateOrIgnore = []interface{}{&Email{UserId: 10010}}
 		}
 		if res := DB.CreateMany([]interface{}{
 			&Email{Id: 1, UserId: 10086, Email: "hello@example.com"}, // Duplicate
@@ -485,20 +485,55 @@ func TestCreateMany(t *testing.T) {
 		if DB.Model(&Email{}).Find(&emails); len(emails) != 2 {
 			t.Error("Expected 2 emails, got", len(emails))
 		}
-		emails2 := emails[0]
-		emails100 := emails[1]
-		if emails2.Id != 2 {
-			emails2 = emails[1]
-			emails100 = emails[0]
+		emailId2 := emails[0]
+		emailId1 := emails[1]
+		if emailId2.Id != 2 {
+			emailId2 = emails[1]
+			emailId1 = emails[0]
 		}
-		if emails2.Id != 2 || emails2.UserId != 10086 {
+		if emailId2.Id != 2 || emailId2.UserId != 10086 {
 			// insert success
 			t.Error("Expected email 2 user ID 10086 , got", emails[0].Id, emails[0].UserId)
 		}
-		if emails100.Id != 100 || emails100.UserId != 10010 {
+		if emailId1.Id != 1 || emailId1.UserId != 10010 {
 			// update success
 			t.Error("Expected email 100 user ID 10010 , got", emails[1].Id, emails[1].UserId)
 		}
 	}
+
+	// OnConflict UPDATE: mysql VALUES function
+	DB.Delete(&Email{})
+	if DB.Dialect().GetName() == "mysql" {
+		DB.Create(&Email{Id: 1, UserId: 10086, Email: "hello@example.com"})
+		DB.Create(&Email{Id: 2, UserId: 10010, Email: "world@example.com"})
+		email1 := Email{}
+		email2 := Email{}
+		DB.Model(&Email{}).Find(&email1, 1)
+		DB.Model(&Email{}).Find(&email2, 2)
+
+		// only UPDATE updated_at and email by VALUES function
+		time.Sleep(1 * time.Second)
+		DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 100, Email: "jeff@example.com"},
+			&Email{Id: 2, UserId: 100, Email: "alan@example.com"},
+		}, "updated_at", "email")
+		emailResult1 := Email{}
+		emailResult2 := Email{}
+		DB.Model(&Email{}).Find(&emailResult1, 1)
+		DB.Model(&Email{}).Find(&emailResult2, 2)
+		if emailResult1.Id != 1 || emailResult1.UserId != 10086 || emailResult1.Email != "jeff@example.com" {
+			t.Error(emailResult1)
+		}
+		if !emailResult1.UpdatedAt.After(email1.UpdatedAt) {
+			t.Error("UpdatedAt should be updated")
+		}
+		if emailResult2.Id != 2 || emailResult2.UserId != 10010 || emailResult2.Email != "alan@example.com" {
+			t.Error(emailResult2)
+		}
+		if !emailResult2.UpdatedAt.After(email2.UpdatedAt) {
+			t.Error("UpdatedAt should be updated")
+		}
+	}
+
 	DB.Delete(&Email{})
 }

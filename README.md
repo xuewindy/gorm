@@ -56,6 +56,20 @@ db.CreateMany([]interface{}{&user1, &user2, &user3}, 'constraint_name', &User{Up
 db.CreateMany([]interface{}{&user1, &user1, &user1})
 ```
 
+> Caution: mssql db driver will not raise error on duplicate
+> **Caution: CreateMany will not trigger `afterCreateCallback`**
+
+### MySQL VALUES function
+
+```go
+// only support MySQL: ON DUPLICATE KEY UPDATE `field` = VALUES(`field`), ...
+DB.CreateMany([]interface{}{
+	&Email{Id: 1, UserId: 100, Email: "jeff@example.com"},
+	&Email{Id: 2, UserId: 100, Email: "alan@example.com"},
+}, "updated_at", "email")
+db.CreateOnConflict(User{UserName: "gorm"}, "updated_at")
+```
+
 ## License
 
 © Jinzhu, 2013~time.Now

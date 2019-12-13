@@ -245,7 +245,17 @@ func (mysql) DefaultValueStr() string {
 	return "VALUES()"
 }
 
-func (mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
+func (d mysql) OnConflict(values ...interface{}) (string, string, interface{}) {
+	if len(values) > 1 {
+		// UPDATE `field` = VALUES(`field`), ...
+		updateKVs := []string{}
+		for _, fieldName := range values {
+			k := d.Quote(fieldName.(string))
+			v := fmt.Sprintf("VALUES(%s)", k)
+			updateKVs = append(updateKVs, fmt.Sprintf("%v = %v", k, v))
+		}
+		return "", fmt.Sprintf("ON DUPLICATE KEY UPDATE %v", strings.Join(updateKVs, ",")), nil
+	}
 	switch values[0].(type) {
 	case string:
 		return "IGNORE", "", nil
