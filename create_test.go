@@ -533,6 +533,18 @@ func TestCreateMany(t *testing.T) {
 		if !emailResult2.UpdatedAt.After(email2.UpdatedAt) {
 			t.Error("UpdatedAt should be updated")
 		}
+		// only UPDATE one field
+		DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 100, Email: "same@qq.com"},
+			&Email{Id: 2, UserId: 100, Email: "same@qq.com"},
+		}, "email")
+		emailResult1 = Email{}
+		emailResult2 = Email{}
+		DB.Model(&Email{}).Find(&emailResult1, 1)
+		DB.Model(&Email{}).Find(&emailResult2, 2)
+		if emailResult1.Email != "same@qq.com" || emailResult2.Email != "same@qq.com" {
+			t.Error("Email should be same@qq.com")
+		}
 	}
 
 	DB.Delete(&Email{})
