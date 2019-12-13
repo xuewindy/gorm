@@ -15,6 +15,8 @@
 
 Because of `ON CONFLICT`.
 
+PostgreSQL not support ON CONFLICT IGNORE (`ON CONFLICT DO NOTHING`) because gorm can not get right `RowsAffected`.
+
 ### GetOrCreate
 
 ```go
@@ -32,21 +34,25 @@ db.CreateOnConflict(User{UserName: "gorm"}, gorm.IGNORE)
 // mysql: INSERT INTO ... ON DUPLICATE KEY UPDATE ...
 db.CreateOnConflict(User{UserName: "gorm"}, User{LastLoginAt: time.Now()})
 
-// postgresql: INSERT INTO ... ON CONFLICT a_key DO UPDATE ...
-db.CreateOnConflict(User{UserName: "gorm"}, "a_key", User{LastLoginAt: time.Now()})
+// postgresql: INSERT INTO ... ON CONFLICT ON CONSTRAINT constraint_name DO UPDATE ...
+db.CreateOnConflict(User{UserName: "gorm"}, "constraint_name", User{LastLoginAt: time.Now()})
 ```
 
 ### CreateMany/CreateMany OnConflict
 
 ```go
 // mysql and sqlite: insert multiple; insert multiple ignore duplicate
+// postgresql and mssql do not support ignore
 db.CreateMany([]interface{}{&user1, &user2, &user3}, gorm.IGNORE)
 db.CreateMany([]interface{}{&user1, &user2, &user3})
 
-// postgresql and mssql do not support ignore
-db.CreateMany([]interface{}{&user1, &user2, &user3})
+// mysql: insert on conflict update
+db.CreateMany([]interface{}{&user1, &user2, &user3}, &User{UpdatedAt: now})
 
-// Caution: mssql db driver do not raise error on duplicate
+// postgresql: insert on confilct update
+db.CreateMany([]interface{}{&user1, &user2, &user3}, 'constraint_name', &User{UpdatedAt: now})
+
+// Caution: mssql db driver will not raise error on duplicate
 db.CreateMany([]interface{}{&user1, &user1, &user1})
 ```
 

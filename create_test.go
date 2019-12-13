@@ -434,31 +434,71 @@ func TestCreateMany(t *testing.T) {
 	// OnConflict IGNORE
 	if DB.Dialect().GetName() == "mssql" {
 		t.Log("mssqldb driver do not raise error when insert many on conflict")
-		return
+	} else {
+		// Duplicate
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
+			&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
+			&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
+			&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
+		}); res.Error == nil {
+			t.Error("Expected error Duplicate entry, but got nil")
+		}
+
 	}
-	if res := DB.CreateMany([]interface{}{
-		&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
-		&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
-		&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
-		&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
-	}); res.Error == nil {
-		t.Error("Expected error Duplicate entry, but got nil")
+	if DB.Dialect().GetName() == "mysql" || DB.Dialect().GetName() == "sqlite3" {
+		// Ignore
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
+			&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
+			&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
+			&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
+		}, "IGNORE"); res.Error != nil {
+			t.Error(res.Error)
+		}
+		emails = []Email{}
+		DB.Model(&Email{}).Find(&emails)
+		if len(emails) != 1 {
+			t.Error("count should be 1, but got", len(emails))
+		}
 	}
-	if DB.Dialect().GetName() != "mysql" && DB.Dialect().GetName() != "sqlite3" {
-		return
-	}
-	if res := DB.CreateMany([]interface{}{
-		&Email{Id: 1, UserId: 1, Email: "jeff@qq.com"},
-		&Email{Id: 1, UserId: 2, Email: "alan@qq.com"},
-		&Email{Id: 1, UserId: 3, Email: "alice@qq.com"},
-		&Email{Id: 1, UserId: 4, Email: "bob@qq.com"},
-	}, "IGNORE"); res.Error != nil {
-		t.Error(res.Error)
-	}
-	emails = []Email{}
-	DB.Model(&Email{}).Find(&emails)
-	if len(emails) != 1 {
-		t.Error("count should be 1, but got", len(emails))
+
+	// OnConflict UPDATE
+	DB.Delete(&Email{})
+	if DB.Dialect().GetName() == "postgres" || DB.Dialect().GetName() == "mysql" {
+		DB.Create(&Email{Id: 1, UserId: 10086, Email: "hello@example.com"})
+
+		var updateOrIgnore []interface{}
+		if DB.Dialect().GetName() == "postgres" {
+			updateOrIgnore = []interface{}{"emails_pkey", &Email{Id: 100, UserId: 10010}}
+		} else {
+			updateOrIgnore = []interface{}{&Email{Id: 100, UserId: 10010}}
+		}
+		if res := DB.CreateMany([]interface{}{
+			&Email{Id: 1, UserId: 10086, Email: "hello@example.com"}, // Duplicate
+			&Email{Id: 2, UserId: 10086, Email: "hello@example.com"}, // Normal
+		}, updateOrIgnore...); res.Error != nil {
+			t.Error(res.Error)
+		}
+
+		emails := []Email{}
+		if DB.Model(&Email{}).Find(&emails); len(emails) != 2 {
+			t.Error("Expected 2 emails, got", len(emails))
+		}
+		emails2 := emails[0]
+		emails100 := emails[1]
+		if emails2.Id != 2 {
+			emails2 = emails[1]
+			emails100 = emails[0]
+		}
+		if emails2.Id != 2 || emails2.UserId != 10086 {
+			// insert success
+			t.Error("Expected email 2 user ID 10086 , got", emails[0].Id, emails[0].UserId)
+		}
+		if emails100.Id != 100 || emails100.UserId != 10010 {
+			// update success
+			t.Error("Expected email 100 user ID 10010 , got", emails[1].Id, emails[1].UserId)
+		}
 	}
 	DB.Delete(&Email{})
 }
